@@ -90,6 +90,7 @@ def process_message_and_output_to_stream(record_value):
 
 
 def start_consuming(topic, partition):
+
     time_counter = int(time.time())
 
     consumer = Consumer({
@@ -110,42 +111,38 @@ def start_consuming(topic, partition):
     total_count = 0
 
     try:
+
         while True:
 
-            msgs = consumer.consume(5000)
+            msg = consumer.poll(2)
 
-            for msg in msgs:
+            if msg is None:
+                script_logger.debug("Waiting for messages")
+                continue
 
-                if msg is None:
+            if msg.error():
+                script_logger.debug('Error while polling: {}'.format(msg.error()))
+                continue
 
-                    script_logger.debug("Waiting for messages")
-                    continue
+            total_count += 1
 
-                elif msg.error():
+            record_epoch_millis = msg.timestamp()[1]
+            if record_epoch_millis > args.end_time:
+                sys.exit(0)
 
-                    script_logger.debug('Error while polling: {}'.format(msg.error()))
+            record_value = json.loads(msg.value())
+            process_message_and_output_to_stream(record_value)
 
-                else:
+            current_time = int(time.time())
+            if (current_time - time_counter) < 120:
+                continue
 
-                    total_count += 1
+            script_logger.debug("Processed {} records so far in {}. Pointer is at {} UTC"
+                                .format(total_count, topic_partn,
+                                        datetime.datetime.utcfromtimestamp(record_epoch_millis)
+                                        .strftime('%A, %B %-d, %Y %H:%M:%S')))
 
-                    record_epoch_millis = msg.timestamp()[1]
-                    if record_epoch_millis > args.end_time:
-                        sys.exit(0)
-
-                    record_value = json.loads(msg.value())
-                    process_message_and_output_to_stream(record_value)
-
-                    current_time = int(time.time())
-                    if (current_time - time_counter) < 120:
-                        continue
-
-                    script_logger.debug("Processed {} records so far in {}. Pointer is at {} UTC"
-                                        .format(total_count, topic_partn,
-                                                datetime.datetime.utcfromtimestamp(record_epoch_millis)
-                                                .strftime('%A, %B %-d, %Y %H:%M:%S')))
-
-                    time_counter = int(time.time())
+            time_counter = int(time.time())
 
     except KeyboardInterrupt:
 
