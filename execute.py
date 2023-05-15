@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import os
-import sys
 import time
 import zlib
 import argparse
@@ -128,7 +127,7 @@ def start_consuming(topic, partition):
 
             record_epoch_millis = msg.timestamp()[1]
             if record_epoch_millis > args.end_time:
-                sys.exit(0)
+                raise KeyboardInterrupt()
 
             record_value = json.loads(msg.value())
             process_message_and_output_to_stream(record_value)
